@@ -61,7 +61,8 @@ class MyAlgorithm(threading.Thread):
         self.kill_event.set()
 
     def execute(self):
-
+       # Getting the first frame
+       # We are going to find the strongest corners using goodFeaturesToTrack function
        frame1 = self.camera.getImage()
        frame1_gray = cv2.cvtColor(frame1, cv2.COLOR_BGR2GRAY)
        p0 = cv2.goodFeaturesToTrack(frame1_gray, 100, 0.01, 10, None, None, 7)
@@ -69,7 +70,7 @@ class MyAlgorithm(threading.Thread):
        lin = np.zeros_like(frame1)
        t = 0
        while(1):
-
+           # We do the same with the next frame
            t = t+1
            frame2 = self.camera.getImage()
            frame2 = cv2.medianBlur(frame2, 5)
@@ -86,7 +87,9 @@ class MyAlgorithm(threading.Thread):
                frame2 = cv2.circle(frame2, (a,b), 5, (0,0,255), -1)
                frame2 = cv2.circle(frame2, (c,d), 5, (255,0,0),-1)
                lin = cv2.line(lin, (a, b), (c, d), (0, 255, 0), 1)
-           if t == 5:
+
+           if t == 2:
+               # Drawing the lines every two frames
                lin = np.zeros_like(frame1)
                t = 0
            img = cv2.add(frame2, lin)
@@ -96,7 +99,8 @@ class MyAlgorithm(threading.Thread):
 
            if img is not None:
             self.camera.setColorImage(img)
-
+           
+           # We have to upload the values
            frame1_gray = np.copy(frame2_gray)
            p0 = cv2.goodFeaturesToTrack(frame1_gray, 100, 0.01, 10, None, None, 7)
 
