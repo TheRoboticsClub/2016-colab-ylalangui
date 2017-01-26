@@ -14,6 +14,9 @@ from parallelIce.pose3dClient import Pose3DClient
 time_cycle = 80
 croppingExt = False
 lin = np.zeros((360,640), np.uint8)
+stop_button = False
+stop = np.zeros((20, 20, 3), np.uint8)
+stop[0:20, 0:20] = (0,0,255)
 
 class MyAlgorithm(threading.Thread):
     global lin
@@ -96,11 +99,15 @@ class MyAlgorithm(threading.Thread):
                 lin = np.zeros((360, 640), dtype=np.uint8)
                 cv2.rectangle(lin, refMov[0], refMov[1], 255, 2)
 
+    def stop_screen(self, event, x, y, flags, param ):
+        global stop_button, lin
+        if (event == cv2.EVENT_LBUTTONDBLCLK) and (stop_button == False):
+            stop_button = True
 
 
     def execute(self):
         # Add your code here
-        global lin
+        global lin, stop, stop_button, stop
 
 
 
@@ -119,34 +126,67 @@ class MyAlgorithm(threading.Thread):
             img_tru = cv2.add(gray_frame, lin)
             cv2.imshow('ROI SELECTION', img_tru)
             key = cv2.waitKey(1) & 0xFF
-            if key == ord("r"):
-                lin = np.zeros((360, 640), dtype=np.uint8)
-            # Tecla enter = 13
-            elif key == 13:
+            if key == 13:
                 if len(refPt) == 2:
                     cv2.destroyWindow('ROI SELECTION')
+                    stop_button = False
                     break
                 else:
                     continue
 
-        print("Puntos a dibujar en Color Filter", refPt)
+        print ("puntos iniciales", refPt[0])
+        print ("puntos finales", refPt[1])
+
+        frame_final = self.camera.getImage()
+        frame_final_cut = frame_final[60:420, 0:640]
+        frame_final_cut = cv2.medianBlur(frame_final_cut, 3)
+        roi_final = frame_final_cut[refPt[0][1]:refPt[1][1], refPt[0][0]:refPt[1][0]]
+        roi_final_gray = cv2.cvtColor(roi_final, cv2.COLOR_BGR2GRAY)
+        p0 = cv2.goodFeaturesToTrack(roi_final_gray, 40, 0.01, 10, None, None, 7)
+        mask = np.zeros_like(roi_final)
+        t = 0
+        while (stop_button == False):
+
+            t = t+1
+            frame_final2 = self.camera.getImage()
+            frame_final_cut2 = frame_final2[60:420, 0:640]
+            frame_final_cut2 = cv2.medianBlur(frame_final_cut2, 5)
+            roi_final2 = frame_final_cut2[refPt[0][1]:refPt[1][1], refPt[0][0]:refPt[1][0]]
+            roi_final_gray2 = cv2.cvtColor(roi_final2, cv2.COLOR_BGR2GRAY)
 
 
-        while (True):
-            frame_final = self.camera.getImage()
-            frame_final_cut = frame_final[60:420, 0:640]
-            lin = np.zeros((360, 640, 3), dtype=np.uint8 )
-            cv2.rectangle(lin, refPt[0], refPt[1], (0,255,0), 2)
-            frame_tru = cv2.add(frame_final_cut, lin)
-            self.camera.setColorImage(frame_tru)
-            cv2.imshow("STOP", lin)
-            print("sigo en el while 1")
-            if key == ord("q"):
-                print("presionado  q")
-                cv2.destroyAllWindows()
-                break
-            print("sigo en el while 2")
+            p1, st, err = cv2.calcOpticalFlowPyrLK(roi_final_gray, roi_final_gray2, p0, None,
+                                                   None, None,
+                                                   (30, 30), 2,
+                                                   (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
+            for i,(f2,f1) in enumerate(zip(p1,p0)):
+                a, b = f2.ravel()
+                c, d = f1.ravel()
+                cv2.circle(roi_final2, (a, b), 5, (255, 255, 0), -1)
+                cv2.circle(roi_final2, (c, d), 5, (255, 0, 0), -1)
+                cv2.line(mask, (a, b), (c, d), (0,0,255), 2)
+            if t==10:
+                mask = np.zeros_like(roi_final2)
+                t =0
+            cv2.rectangle(frame_final_cut2, refPt[0], refPt[1], (0,255,0), 2)
+            frame_final_cut2[refPt[0][1]:refPt[1][1], refPt[0][0]:refPt[1][0]]=cv2.add(roi_final2, mask)
 
-        print("y vuelta a empezar")
+
+            #l in = np.zeros((360, 640, 3), dtype=np.uint8 )
+            # cv2.rectangle(lin, refPt[0], refPt[1], (0,255,0), 2)
+
+            # frame_tru = cv2.add(frame_final_cut, lin)
+            cv2.imshow("DOUBLE-CLICK STOP BUTTON", stop)
+            cv2.setMouseCallback("DOUBLE-CLICK STOP BUTTON", self.stop_screen)
+            self.camera.setColorImage(frame_final_cut2)
+
+            roi_final_gray = np.copy(roi_final_gray2)
+            p0 = cv2.goodFeaturesToTrack(roi_final_gray, 40, 0.01, 10, None, None, 7)
+
+        cv2.destroyWindow("DOUBLE-CLICK STOP BUTTON")
+        lin = np.zeros((360, 640), dtype=np.uint8)
+
+
+
 
 
