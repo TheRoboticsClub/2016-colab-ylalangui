@@ -162,12 +162,12 @@ class MyAlgorithm(threading.Thread):
             for i,(f2,f1) in enumerate(zip(p1,p0)):
                 a, b = f2.ravel()
                 c, d = f1.ravel()
-                cv2.circle(roi_final2, (a, b), 5, (255, 255, 0), -1)
-                cv2.circle(roi_final2, (c, d), 5, (255, 0, 0), -1)
+                cv2.circle(mask, (a, b), 5, (255, 255, 0), -1)
+                cv2.circle(mask, (c, d), 5, (255, 0, 0), -1)
                 cv2.line(mask, (a, b), (c, d), (0,0,255), 2)
-            if t==10:
-                mask = np.zeros_like(roi_final2)
-                t =0
+            #if t==10:
+            #    mask = np.zeros_like(roi_final2)
+            #    t =0
             cv2.rectangle(frame_final_cut2, refPt[0], refPt[1], (0,255,0), 2)
             frame_final_cut2[refPt[0][1]:refPt[1][1], refPt[0][0]:refPt[1][0]]=cv2.add(roi_final2, mask)
 
@@ -178,8 +178,10 @@ class MyAlgorithm(threading.Thread):
             # frame_tru = cv2.add(frame_final_cut, lin)
             cv2.imshow("DOUBLE-CLICK STOP BUTTON", stop)
             cv2.setMouseCallback("DOUBLE-CLICK STOP BUTTON", self.stop_screen)
-            self.camera.setColorImage(frame_final_cut2)
+            if frame_final_cut2 is not None:
+                self.camera.setColorImage(frame_final_cut2)
 
+            mask = np.zeros_like(roi_final)
             roi_final_gray = np.copy(roi_final_gray2)
             p0 = cv2.goodFeaturesToTrack(roi_final_gray, 40, 0.01, 10, None, None, 7)
 
