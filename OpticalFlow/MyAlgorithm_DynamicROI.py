@@ -107,7 +107,7 @@ class MyAlgorithm(threading.Thread):
 
     def execute(self):
         # Add your code here
-        global lin, stop, stop_button, stop
+        global lin, stop, stop_button, stop, refPt, refMov
 
 
 
@@ -134,58 +134,85 @@ class MyAlgorithm(threading.Thread):
                 else:
                     continue
 
-        print ("puntos iniciales", refPt[0])
-        print ("puntos finales", refPt[1])
-
         frame_final = self.camera.getImage()
         frame_final_cut = frame_final[60:420, 0:640]
         frame_final_cut = cv2.medianBlur(frame_final_cut, 3)
-        roi_final = frame_final_cut[refPt[0][1]:refPt[1][1], refPt[0][0]:refPt[1][0]]
-        roi_final_gray = cv2.cvtColor(roi_final, cv2.COLOR_BGR2GRAY)
-        p0 = cv2.goodFeaturesToTrack(roi_final_gray, 40, 0.01, 10, None, None, 7)
-        mask = np.zeros_like(roi_final)
-        t = 0
+        frame_final_cut_gray = cv2.cvtColor(frame_final_cut, cv2.COLOR_BGR2GRAY)
+        p0 = cv2.goodFeaturesToTrack(frame_final_cut_gray, 100, 0.01, 10, None, None, 7)
+        index = 0
+        for i in (p0):
+            if (i[0][0] < refPt[0][0]) or (i[0][0] > refPt[1][0]) or (i[0][1] < refPt[0][1]) or (i[0][1] > refPt[1][1]):
+                p0 = np.delete(p0, index, axis=0)
+            else:
+                index = index + 1
+        
+
         while (stop_button == False):
 
-            t = t+1
             frame_final2 = self.camera.getImage()
             frame_final_cut2 = frame_final2[60:420, 0:640]
-            frame_final_cut2 = cv2.medianBlur(frame_final_cut2, 5)
-            roi_final2 = frame_final_cut2[refPt[0][1]:refPt[1][1], refPt[0][0]:refPt[1][0]]
-            roi_final_gray2 = cv2.cvtColor(roi_final2, cv2.COLOR_BGR2GRAY)
+            frame_final_cut2 = cv2.medianBlur(frame_final_cut2, 3)
+            frame_final_cut2_gray = cv2.cvtColor(frame_final_cut2, cv2.COLOR_BGR2GRAY)
 
-
-            p1, st, err = cv2.calcOpticalFlowPyrLK(roi_final_gray, roi_final_gray2, p0, None,
+            p1, st, err = cv2.calcOpticalFlowPyrLK(frame_final_cut_gray, frame_final_cut2_gray, p0, None,
                                                    None, None,
                                                    (30, 30), 2,
                                                    (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
+
+            good_p1 = p1[st==1]
+            maxAll = np.amax(good_p1, axis = 0)
+            minAll = np.amin(good_p1, axis = 0)
+            maxX = maxAll[0]#[0]
+            maxY = maxAll[1]#[1]
+            minX = minAll[0]#[0]
+            minY = minAll[1]#[1]
+            """
+            if (maxX-minX) < 50:
+                maxX = maxX + 50
+                minX = minX - 50
+            if (maxY-minY) < 50:
+                maxY = maxY + 50
+                minY = minY-50
+            """
             for i,(f2,f1) in enumerate(zip(p1,p0)):
                 a, b = f2.ravel()
                 c, d = f1.ravel()
-                cv2.circle(mask, (a, b), 5, (255, 255, 0), -1)
-                cv2.circle(mask, (c, d), 5, (255, 0, 0), -1)
-                cv2.line(mask, (a, b), (c, d), (0,0,255), 2)
-            #if t==10:
-            #    mask = np.zeros_like(roi_final2)
-            #    t =0
-            cv2.rectangle(frame_final_cut2, refPt[0], refPt[1], (0,255,0), 2)
-            frame_final_cut2[refPt[0][1]:refPt[1][1], refPt[0][0]:refPt[1][0]]=cv2.add(roi_final2, mask)
+                cv2.circle(frame_final_cut2, (a, b), 5, (255, 255, 0), -1)
+                cv2.circle(frame_final_cut2, (c, d), 5, (255, 0, 0), -1)
+                cv2.line(frame_final_cut2, (a, b), (c, d), (0,0,255), 2)
 
+            cv2.rectangle(frame_final_cut2, (np.int0(minX), np.int0(minY)), (np.int0(maxX), np.int0(maxY)), (0,255,0), 2)
 
-            #l in = np.zeros((360, 640, 3), dtype=np.uint8 )
-            # cv2.rectangle(lin, refPt[0], refPt[1], (0,255,0), 2)
-
-            # frame_tru = cv2.add(frame_final_cut, lin)
             cv2.imshow("DOUBLE-CLICK STOP BUTTON", stop)
             cv2.setMouseCallback("DOUBLE-CLICK STOP BUTTON", self.stop_screen)
             if frame_final_cut2 is not None:
                 self.camera.setColorImage(frame_final_cut2)
 
-            mask = np.zeros_like(roi_final)
-            roi_final_gray = np.copy(roi_final_gray2)
-            p0 = cv2.goodFeaturesToTrack(roi_final_gray, 40, 0.01, 10, None, None, 7)
+            frame_final_cut_gray = np.copy(frame_final_cut2_gray)
+
+
+            p0 = cv2.goodFeaturesToTrack(frame_final_cut_gray, 100, 0.01, 10, None, None, 7)
+            index2 = 0
+            for p in (p0):
+                if (p[0][0] < (np.int0(minX) -2) or p[0][0] > (np.int0(maxX) +2)) or (p[0][1] < (np.int0(minY)-2) or p[0][1] > (np.int0(maxY)+2)):
+                    p0 = np.delete(p0, index2, axis=0)
+                else:
+                    index2 = index2 + 1
+
+            if len(p0)<10:
+                cv2.rectangle(frame_final_cut2, (np.int0(minX), np.int0(minY)), (np.copy(maxX), np.int0(maxY)), (0, 255, 0), 2)
+                p0 = cv2.goodFeaturesToTrack(frame_final_cut_gray, 100, 0.01, 10, None, None, 7)
+                index3 = 0
+                for g in (p0):
+                    if ((g[0][0] < (minX - 20)) or (g[0][0] > (maxX + 20))) or ((g[0][1] < (minY - 20)) or (g[0][1] > (maxY + 20))):
+                        p0 = np.delete(p0, index3, axis=0)
+                    else:
+                        index3 = index3 + 1
+
 
         cv2.destroyWindow("DOUBLE-CLICK STOP BUTTON")
+        refPt = []
+        refMov = []
         lin = np.zeros((360, 640), dtype=np.uint8)
 
 
